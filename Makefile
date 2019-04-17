@@ -53,8 +53,15 @@ test_fastas:
 			--fastas testing/fastas/*.fasta \
 			-profile local
 
+test_protein:
+	nextflow run main.nf -profile test_protein,docker
 
-test: test_sra test_samplescsv test_read_pairs test_fastas
+test_dna:
+	nextflow run main.nf -profile test_dna,docker
+
+test_travis: test_protein test_dna
+
+test_local: test_sra test_samplescsv test_read_pairs test_fastas
 
 
 

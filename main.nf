@@ -62,6 +62,8 @@ def helpMessage() {
                                     Useful for comparing e.g. assembled transcriptomes or metagenomes.
                                     (Not typically used for raw sequencing data as this would create
                                     a k-mer signature for each read!)
+      --input_is_protein            If the input is already translated protein, don't try to translate
+                                    it and use the amino acid seq directly
     """.stripIndent()
 }
 
@@ -124,6 +126,9 @@ params.ksizes = '21,27,33,51'
 params.molecules =  'dna,protein'
 params.log2_sketch_sizes = '10,12,14,16'
 
+// If no --outdir is specified, create a folder "output"
+outdir = params.outdir ? params.outdir : "output"
+
 // Parse the parameters
 ksizes = params.ksizes?.toString().tokenize(',')
 molecules = params.molecules?.toString().tokenize(',')
@@ -132,7 +137,7 @@ log2_sketch_sizes = params.log2_sketch_sizes?.toString().tokenize(',')
 
 process sourmash_compute_sketch {
 	tag "${sample_id}_${sketch_id}"
-	publishDir "${params.outdir}/sketches", mode: 'copy'
+	publishDir "${outdir}/sketches", mode: 'copy'
 	container 'czbiohub/nf-kmer-similarity'
 
 	// If job fails, try again with more memory
@@ -151,6 +156,7 @@ process sourmash_compute_sketch {
 
 	script:
   sketch_id = "molecule-${molecule}_ksize-${ksize}_log2sketchsize-${log2_sketch_size}"
+  input_is_protein = params.input_is_protein ? "--input-is-protein" : ""
   molecule = molecule
   ksize = ksize
   if ( params.one_signature_per_record ){
@@ -159,6 +165,7 @@ process sourmash_compute_sketch {
       --num-hashes \$((2**$log2_sketch_size)) \
       --ksizes $ksize \
       --$molecule \
+      $input_is_protein \
       --output ${sample_id}_${sketch_id}.sig \
       $read1 $read2
     """
@@ -168,6 +175,7 @@ process sourmash_compute_sketch {
       --num-hashes \$((2**$log2_sketch_size)) \
       --ksizes $ksize \
       --$molecule \
+      $input_is_protein \
       --output ${sample_id}_${sketch_id}.sig \
       --merge '$sample_id' $reads
     """
@@ -182,7 +190,7 @@ process sourmash_compare_sketches {
 	tag "${sketch_id}"
 
 	container 'czbiohub/nf-kmer-similarity'
-	publishDir "${params.outdir}/", mode: 'copy'
+	publishDir "${outdir}/", mode: 'copy'
 	errorStrategy 'retry'
   maxRetries 3
 
