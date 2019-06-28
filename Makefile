@@ -22,12 +22,16 @@ run_ndnd_local:
 	sudo nextflow run main.nf -work-dir ${HOME}/pure-scratch/nextflow/ \
 		-process.executor='local'
 
+test_docker:
+	nextflow run -profile test,docker main.nf -ansi-log false
+	nextflow run -profile test,docker main.nf --no_trimming
 
 test_sra:
-		nextflow run main.nf --sra "SRP016501" -profile local \
+		nextflow run main.nf --sra "SRP016501"\
 			--ksizes 11 \
 			--log2_sketch_sizes 2 \
-			--molecules dna
+			--molecules dna \
+			-profile docker,local
 
 
 test_samplescsv:
@@ -35,26 +39,27 @@ test_samplescsv:
 			--outdir testing-output/samplescsv/ \
 			--molecules dna,protein \
 			--samples testing/samples.csv \
-			-profile local
+			-profile docker
 
 test_read_pairs:
 		nextflow run main.nf \
+			-latest \
 			--ksizes 3,9 \
 			--log2_sketch_sizes 2,4 \
 			--molecules dna,protein \
-			--read_pairs testing/fastqs/*{1,2}.fastq.gz \
-			-profile local
+			--read_pairs 'testing/fastqs/*{1,2}.fastq.gz' \
+			-profile docker -dump-channels
 
 test_fastas:
 		nextflow run main.nf \
 			--ksizes 3,9 \
 			--log2_sketch_sizes 2,4 \
 			--molecules dna,protein \
-			--fastas testing/fastas/*.fasta \
-			-profile local
+			--fastas 'testing/fastas/*.fasta' \
+			-profile docker
 
 
-test: test_sra test_samplescsv test_read_pairs test_fastas
+test: test_read_pairs test_fastas test_samplescsv test_sra
 
 
 
