@@ -62,6 +62,9 @@ def helpMessage() {
                                     Useful for comparing e.g. assembled transcriptomes or metagenomes.
                                     (Not typically used for raw sequencing data as this would create
                                     a k-mer signature for each read!)
+      --create_sbt_index            Create a sequence bloom tree database of all samples' k-mer signatures
+      --no-compare                  Don't compare all samples and output a csv
+
     """.stripIndent()
 }
 
@@ -72,6 +75,15 @@ if (params.help){
     helpMessage()
     exit 0
 }
+
+// Has the run name been specified by the user?
+//  this has the bonus effect of catching both -name and --name
+custom_runName = params.name
+if( !(workflow.runName ==~ /[a-z]+_[a-z]+/) ){
+  custom_runName = workflow.runName
+}
+
+
 
 /*
  * SET UP CONFIGURATION VARIABLES
@@ -131,12 +143,10 @@ log2_sketch_sizes = params.log2_sketch_sizes?.toString().tokenize(',')
 
 
 process sourmash_compute_sketch {
-	tag "${sample_id}_${sketch_id}"
+	tag "${custom_runName}_${sample_id}_${sketch_id}"
 	publishDir "${params.outdir}/sketches", mode: 'copy'
 	container 'czbiohub/nf-kmer-similarity'
 
-	// If job fails, try again with more memory
-	// memory { 8.GB * task.attempt }
 	errorStrategy 'retry'
   maxRetries 3
 
@@ -147,7 +157,7 @@ process sourmash_compute_sketch {
 	set sample_id, file(reads) from reads_ch
 
 	output:
-  set val(sketch_id), val(molecule), val(ksize), val(log2_sketch_size), file("${sample_id}_${sketch_id}.sig") into sourmash_sketches
+  set val(sketch_id), val(molecule), val(ksize), val(log2_sketch_size), file("${sample_id}_${sketch_id}.sig") into sketches_compare, sketches_index
 
 	script:
   sketch_id = "molecule-${molecule}_ksize-${ksize}_log2sketchsize-${log2_sketch_size}"
@@ -175,31 +185,59 @@ process sourmash_compute_sketch {
 
 }
 
-// sourmash_sketches.println()
-// sourmash_sketches.groupTuple(by: [0,3]).println()
+if (!params.no_compare){
+  process sourmash_compare_sketches {
+  	tag "${custom_runName}_${sketch_id}"
 
-process sourmash_compare_sketches {
-	tag "${sketch_id}"
+  	container 'czbiohub/nf-kmer-similarity'
+  	publishDir "${params.outdir}/", mode: 'copy'
+  	errorStrategy 'retry'
+    maxRetries 3
 
-	container 'czbiohub/nf-kmer-similarity'
-	publishDir "${params.outdir}/", mode: 'copy'
-	errorStrategy 'retry'
-  maxRetries 3
+  	input:
+    set val(sketch_id), val(molecule), val(ksize), val(log2_sketch_size), file ("sketches/*.sig") \
+      from sketches_compare.groupTuple(by: [0, 3])
 
-	input:
-  set val(sketch_id), val(molecule), val(ksize), val(log2_sketch_size), file ("sketches/*.sig") \
-    from sourmash_sketches.groupTuple(by: [0, 3])
+  	output:
+  	file "similarities_${sketch_id}.csv"
 
-	output:
-	file "similarities_${sketch_id}.csv"
+  	script:
+  	"""
+  	sourmash compare \
+          --ksize ${ksize[0]} \
+          --${molecule[0]} \
+          --csv similarities_${sketch_id}.csv \
+          --traverse-directory .
+  	"""
 
-	script:
-	"""
-	sourmash compare \
-        --ksize ${ksize[0]} \
-        --${molecule[0]} \
-        --csv similarities_${sketch_id}.csv \
-        --traverse-directory .
-	"""
+  }
+}
 
+
+if (params.create_sbt_index) {
+  process sourmash_index_sketches {
+  	tag "${custom_runName}_${sketch_id}"
+
+  	container 'czbiohub/nf-kmer-similarity'
+  	publishDir "${params.outdir}/indexes", mode: 'copy'
+  	errorStrategy 'retry'
+    maxRetries 3
+
+  	input:
+    set val(sketch_id), val(molecule), val(ksize), val(log2_sketch_size), file ("sketches/*.sig") \
+      from sketches_index.groupTuple(by: [0, 3])
+
+  	output:
+  	file "${sketch_id}.sbt.json"
+    file ".sbt.${sketch_id}"
+
+  	script:
+  	"""
+  	sourmash index \
+          --ksize ${ksize[0]} \
+          --${molecule[0]} \
+          --traverse-directory $sketch_id .
+  	"""
+
+  }
 }
