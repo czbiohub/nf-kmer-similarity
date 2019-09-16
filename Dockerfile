@@ -15,7 +15,7 @@ USER root
 RUN useradd -ms /bin/bash main
 
 
-ENV PACKAGES zlib1g git g++ make ca-certificates gcc zlib1g-dev libc6-dev procps
+ENV PACKAGES zlib1g git g++ make ca-certificates gcc zlib1g-dev libc6-dev procps libbz2-dev libcurl4-openssl-dev libssl-dev
 
 ### don't modify things below here for version updates etc.
 
@@ -25,28 +25,27 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends ${PACKAGES} && \
     apt-get clean
 
-RUN conda install --yes Cython bz2file pytest numpy matplotlib scipy sphinx alabaster
+RUN /opt/conda/bin/conda install --yes Cython bz2file pytest numpy matplotlib scipy sphinx alabaster
 
 RUN cd /home && \
     git clone https://github.com/dib-lab/khmer.git -b master && \
     cd khmer && \
-    python3 setup.py install
+    /opt/conda/bin/python3 setup.py install && \
+    /opt/conda/bin/trim-low-abund.py --version && \
+    /opt/conda/bin/trim-low-abund.py --help
 
-# Check that khmer was installed properly
-RUN trim-low-abund.py --help
-RUN trim-low-abund.py --version
-
-
+RUN which -a /opt/conda/bin/python3
+RUN /opt/conda/bin/python3 --version
 # Required for multiprocessing of 10x bam file
-# RUN pip install pathos bamnostic
+RUN /opt/conda/bin/pip install pathos pysam
 
 # ENV SOURMASH_VERSION master
 RUN cd /home && \
     git clone https://github.com/dib-lab/sourmash.git && \
     cd sourmash && \
-    python3 setup.py install
+    /opt/conda/bin/python3 setup.py install
 
-RUN which -a python3
-RUN python3 --version
-RUN sourmash info
+RUN which -a /opt/conda/bin/python3
+RUN /opt/conda/bin/python3 --version
+RUN /opt/conda/bin/sourmash info
 COPY docker/sysctl.conf /etc/sysctl.conf
