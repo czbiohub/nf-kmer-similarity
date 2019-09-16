@@ -5,7 +5,7 @@ MAINTAINER olga.botvinnik@czbiohub.org
 ARG VCS_REF
 LABEL org.label-schema.vcs-ref=$VCS_REF \
 org.label-schema.vcs-url="e.g. https://github.com/czbiohub/nf-kmer-similarity"
-
+ARG BUILD_DATE
 
 WORKDIR /home
 
