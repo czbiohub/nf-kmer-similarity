@@ -11,6 +11,8 @@ WORKDIR /home
 
 USER root
 
+ENV PATH="/opt/conda/bin:${PATH}"
+
 # Add user "main" because that's what is expected by this image
 RUN useradd -ms /bin/bash main
 
@@ -25,27 +27,27 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends ${PACKAGES} && \
     apt-get clean
 
-RUN /opt/conda/bin/conda install --yes Cython bz2file pytest numpy matplotlib scipy sphinx alabaster
+RUN conda install --yes Cython bz2file pytest numpy matplotlib scipy sphinx alabaster
 
 RUN cd /home && \
     git clone https://github.com/dib-lab/khmer.git -b master && \
     cd khmer && \
-    /opt/conda/bin/python3 setup.py install && \
-    /opt/conda/bin/trim-low-abund.py --version && \
-    /opt/conda/bin/trim-low-abund.py --help
+    python3 setup.py install && \
+    trim-low-abund.py --version && \
+    trim-low-abund.py --help
 
-RUN which -a /opt/conda/bin/python3
-RUN /opt/conda/bin/python3 --version
+RUN which -a python3
+RUN python3 --version
 # Required for multiprocessing of 10x bam file
-RUN /opt/conda/bin/pip install pathos pysam
+RUN pip install pathos pysam
 
 # ENV SOURMASH_VERSION master
 RUN cd /home && \
     git clone https://github.com/dib-lab/sourmash.git && \
     cd sourmash && \
-    /opt/conda/bin/python3 setup.py install
+    python3 setup.py install
 
-RUN which -a /opt/conda/bin/python3
-RUN /opt/conda/bin/python3 --version
-RUN /opt/conda/bin/sourmash info
+RUN which -a python3
+RUN python3 --version
+RUN sourmash info
 COPY docker/sysctl.conf /etc/sysctl.conf
